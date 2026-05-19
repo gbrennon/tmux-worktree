@@ -1,11 +1,14 @@
 #!/bin/bash
 
 show_error() {
+    local msg="$1"
+    printf '%s\n' "$msg" >&2
     local tmpfile
     tmpfile=$(mktemp)
-    printf '%s\n' "$1" > "$tmpfile"
+    printf '%s\n' "$msg" > "$tmpfile"
     tmux display-popup -E -h 20 \
-        "cat '$tmpfile'; echo; echo 'Press any key to dismiss'; read -n1; rm -f '$tmpfile'"
+        "cat '$tmpfile'; echo; echo 'Press any key or wait 10s...'; read -t 10 -n1 2>/dev/null || true; rm -f '$tmpfile'" 2>/dev/null || \
+        tmux display-message -d 5000 "tmux-worktrees: $msg" 2>/dev/null || true
 }
 
 find_repo_root() {
@@ -31,7 +34,6 @@ find_repo_root() {
 }
 
 create_or_resume() {
-    exec 2>/dev/null
     local branch="$1" repo_root worktrees_dir target target_abs
     if [[ -z "$branch" ]]; then
         show_error "Branch name cannot be empty — type a name (e.g. feat/foo) or select an existing worktree"
@@ -50,7 +52,7 @@ create_or_resume() {
                 echo "$worktrees_dir/" >> .git/info/exclude
         fi
     fi
-    target="$worktrees_dir/$branch"
+    target="$worktrees_dir/$(echo "$branch" | tr '/' '-')"
     if [[ ! -d "$target" ]]; then
         local default_branch output
         if git show-ref --verify --quiet refs/heads/main 2>/dev/null; then
@@ -114,11 +116,17 @@ select_worktree() {
         branch=$(echo "$result" | head -1)
     fi
     [[ -z "$branch" ]] && exit 0
+    # Resolve real git branch name if selection is an existing worktree dir
+    if [[ -d "$worktrees_dir/$branch" ]]; then
+        local resolved
+        resolved=$(git -C "$worktrees_dir/$branch" rev-parse --abbrev-ref HEAD 2>/dev/null)
+        [[ -n "$resolved" ]] && branch="$resolved"
+    fi
     create_or_resume "$branch"
 }
 
 cleanup_worktrees() {
-    local repo_root worktrees_dir default_branch result branch
+    local repo_root worktrees_dir default_branch result branch wt_dir
     repo_root=$(find_repo_root) || {
         show_error "Not in a git repository — no .git directory found when walking up from:\n\n  $(pwd)\n\nChecked all parent directories up to /."
         exit 0
@@ -137,9 +145,9 @@ cleanup_worktrees() {
     while IFS= read -r wt_dir; do
         branch=$(git -C "$wt_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "?")
         if git branch --merged "$default_branch" 2>/dev/null | grep -qxF "  $branch"; then
-            fzf_input+="✓ merged  | $branch"$'\n'
+            fzf_input+="✓ merged  | $branch"$'\t'"$wt_dir"$'\n'
         else
-            fzf_input+="✗ active  | $branch"$'\n'
+            fzf_input+="✗ active  | $branch"$'\t'"$wt_dir"$'\n'
         fi
     done < <(find "$worktrees_dir" -mindepth 2 -name '.git' -type f -printf '%h\n' 2>/dev/null)
     if [[ -z "$fzf_input" ]]; then
@@ -150,9 +158,10 @@ cleanup_worktrees() {
         --prompt="Remove worktree> " \
         --header="Enter to remove selected worktree" \
         2>/dev/null) || exit 0
-    branch=$(echo "$result" | sed 's/^.*| *//')
+    branch=$(echo "$result" | cut -f1 | sed 's/^.*| *//')
     [[ -z "$branch" ]] && exit 0
-    local target="$worktrees_dir/$branch"
+    wt_dir=$(echo "$result" | cut -f2)
+    local target="$wt_dir"
     if tmux list-windows -F '#{window_name}' 2>/dev/null | grep -Fxq "wt-$branch"; then
         tmux kill-window -t "wt-$branch"
     fi
@@ -161,7 +170,7 @@ cleanup_worktrees() {
         show_error "Worktree removal failed:\n\n$output"
         exit 0
     }
-    output=$(git branch -d "$branch" 2>&1) || true
+    output=$(git branch -D "$branch" 2>&1) || true
     tmux display-message "Removed worktree: $branch"
 }
 
