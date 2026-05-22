@@ -76,6 +76,20 @@ between worktrees, `prefix + D` to clean up.
 
 ---
 
+## Testing
+
+Run the full test suite from the project root:
+
+```bash
+bash tests/run.sh
+```
+
+Requires `git >= 2.28` (for `init.defaultBranch` support) and `bash >= 4.0`.
+Tests create and tear down temporary git repositories in `/tmp` — no project
+files are touched.
+
+---
+
 ## License
 
 MIT
