@@ -133,18 +133,33 @@ cleanup_worktrees() {
     }
     cd "$repo_root" || { show_error "Cannot cd to $repo_root"; exit 0; }
     worktrees_dir=".worktrees"
-    if git show-ref --verify --quiet refs/heads/main 2>/dev/null; then
+    default_branch=$(git config --global init.defaultBranch 2>/dev/null)
+    if [[ -z "$default_branch" ]]; then
+        default_branch=$(git config init.defaultBranch 2>/dev/null)
+    fi
+    if [[ -z "$default_branch" ]]; then
+        default_branch=$(git branch --show-current 2>/dev/null)
+    fi
+    if [[ -z "$default_branch" ]]; then
         default_branch="main"
-    elif git show-ref --verify --quiet refs/heads/master 2>/dev/null; then
-        default_branch="master"
-    else
-        show_error "Neither main nor master branch found in:\n\n  $repo_root\n\nExisting branches:\n$(git branch 2>/dev/null | head -10)"
-        exit 0
+    fi
+    local auto_fetch
+    auto_fetch=$(tmux show-option -gv @worktree-auto-fetch 2>/dev/null)
+    auto_fetch="${auto_fetch:-true}"
+    if [[ "$auto_fetch" != "false" ]]; then
+        git fetch origin "$default_branch" --no-tags --depth=1 2>/dev/null || true
     fi
     local fzf_input=""
     while IFS= read -r wt_dir; do
         branch=$(git -C "$wt_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "?")
-        if git branch --merged "$default_branch" 2>/dev/null | grep -qxF "  $branch"; then
+        local merged=false
+        if git -C "$wt_dir" merge-base --is-ancestor HEAD "origin/$default_branch" 2>/dev/null; then
+            merged=true
+        elif [[ "$auto_fetch" != "false" ]] && \
+             ! git ls-remote --exit-code origin "refs/heads/$branch" 2>/dev/null; then
+            merged=true
+        fi
+        if [[ "$merged" == "true" ]]; then
             fzf_input+="✓ merged  | $branch"$'\t'"$wt_dir"$'\n'
         else
             fzf_input+="✗ active  | $branch"$'\t'"$wt_dir"$'\n'
