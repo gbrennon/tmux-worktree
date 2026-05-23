@@ -72,6 +72,36 @@ test_create_and_remove_worktree() {
     assert_eq "test-feat" "$branch"
 }
 
+test_remove_worktree_force_dirty() {
+    local repo output removed
+    repo=$(setup_temp_repo)
+    cd "$repo" || return 1
+
+    mkdir -p ".worktrees"
+    output=$(create_worktree ".worktrees/dirty-feat" "dirty-feat" "main" 2>&1)
+    if [[ $? -ne 0 ]]; then
+        teardown_temp_repo "$repo"
+        echo "  (skipped — git worktree add failed: $output)"
+        return 0
+    fi
+
+    # Make an uncommitted change — removal without --force would fail here
+    echo "uncommitted" >> ".worktrees/dirty-feat/init.txt"
+
+    remove_worktree ".worktrees/dirty-feat" >/dev/null 2>&1
+    removed=$?
+
+    # Directory must be gone even with uncommitted changes
+    if [[ -d ".worktrees/dirty-feat" ]]; then
+        teardown_temp_repo "$repo"
+        echo "    directory still exists after force removal" >&2
+        return 1
+    fi
+
+    teardown_temp_repo "$repo"
+    assert_eq "0" "$removed" "remove should succeed with --force on dirty worktree"
+}
+
 test_list_worktrees_with_entries() {
     local repo output result
     repo=$(setup_temp_repo)

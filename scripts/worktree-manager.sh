@@ -44,9 +44,6 @@ select_worktree() {
     cd "$repo_root" || { show_error "Cannot cd to $repo_root"; exit 0; }
     local existing branch
     existing=$(list_worktree_names ".worktrees")
-    if [[ -z "$existing" ]]; then
-        existing=$'\n'
-    fi
     branch=$(fzf_select_worktree "$existing")
     [[ -z "$branch" ]] && exit 0
     if [[ -d ".worktrees/$branch" ]]; then
@@ -69,7 +66,7 @@ cleanup_worktrees() {
     auto_fetch=$(tmux show-option -gv @worktree-auto-fetch 2>/dev/null)
     auto_fetch="${auto_fetch:-true}"
     if [[ "$auto_fetch" != "false" ]]; then
-        git fetch origin "$default_branch" --no-tags --depth=1 2>/dev/null || true
+        git fetch origin "$default_branch" --no-tags --depth=1 2>/dev/null &
     fi
     local fzf_input=""
     local wt_dir branch
@@ -82,12 +79,14 @@ cleanup_worktrees() {
         fi
     done < <(list_worktrees ".worktrees")
     if [[ -z "$fzf_input" ]]; then
-        show_error "No worktrees found in .worktrees/"
-        exit 0
+        fzf_input="No worktrees found in .worktrees/ — press Enter to dismiss"
     fi
     local result
     result=$(fzf_cleanup_picker "$fzf_input")
     [[ -z "$result" ]] && exit 0
+    if [[ "$result" != *$'\t'* ]]; then
+        exit 0
+    fi
     branch=$(echo "$result" | cut -f1 | sed 's/^.*| *//')
     wt_dir=$(echo "$result" | cut -f2)
     tmux_kill_window "$branch"

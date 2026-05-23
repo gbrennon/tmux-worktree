@@ -131,3 +131,27 @@ test_is_merged_fast_forward_detected() {
     teardown_temp_repo "$repo"
     assert_eq "0" "$result" "fast-forward merge should be detected"
 }
+
+test_is_merged_no_network_calls() {
+    local repo result start end elapsed
+    repo=$(setup_temp_repo)
+    cd "$repo" || return 1
+
+    # No origin remote — is_merged should fail fast on the local check only,
+    # without making any network calls.  Must complete in under 1 second.
+    start=$(date +%s)
+    is_merged "." "some-branch" "main" "true"
+    result=$?
+    end=$(date +%s)
+    elapsed=$((end - start))
+
+    teardown_temp_repo "$repo"
+
+    # Without origin/main ref the ancestry check fails → not merged
+    assert_eq "1" "$result" "missing origin/main ref should return not-merged"
+    if [[ $elapsed -ge 1 ]]; then
+        echo "    took ${elapsed}s — should be instantaneous (no network)" >&2
+        return 1
+    fi
+    return 0
+}

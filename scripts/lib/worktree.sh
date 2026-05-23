@@ -16,7 +16,7 @@ create_worktree() {
 
 remove_worktree() {
     local target="$1"
-    git worktree remove "$target" 2>&1
+    git worktree remove --force "$target" 2>&1
 }
 
 worktree_branch() {

@@ -2,7 +2,7 @@ fzf_select_worktree() {
     local existing="$1"
     local result branch
     exec 3>&2 2>/dev/null
-    result=$(echo "$existing" | fzf-tmux -p 60%,40% \
+    result=$(printf "%s\n" "$existing" | fzf-tmux -p 60%,40% \
         --prompt="Worktree> " \
         --print-query \
         --header="Type to filter, Enter to select/create" \
