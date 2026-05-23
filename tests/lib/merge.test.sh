@@ -148,10 +148,10 @@ test_is_merged_no_network_calls() {
     teardown_temp_repo "$repo"
 
     # Without origin/main ref the ancestry check fails → not merged
-    assert_eq "1" "$result" "missing origin/main ref should return not-merged"
+    assert_eq "1" "$result" "missing origin/main ref should return not-merged" || return 1
     if [[ $elapsed -ge 1 ]]; then
         echo "    took ${elapsed}s — should be instantaneous (no network)" >&2
         return 1
     fi
-    return 0
+    
 }

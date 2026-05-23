@@ -35,5 +35,5 @@ worktree_abspath() {
 
 delete_local_branch() {
     local branch="$1"
-    git branch -D "$branch" 2>&1 || true
+    git branch -D "$branch" >/dev/null 2>&1 || true
 }
