@@ -44,7 +44,11 @@ select_worktree() {
     cd "$repo_root" || { show_error "Cannot cd to $repo_root"; exit 0; }
     local existing branch
     existing=$(list_worktree_names ".worktrees")
-    branch=$(fzf_select_worktree "$existing")
+    if [[ -z "$existing" ]]; then
+        branch=$(fzf_select_worktree "" "No worktrees yet — type a name and press Enter to create")
+    else
+        branch=$(fzf_select_worktree "$existing")
+    fi
     [[ -z "$branch" ]] && exit 0
     if [[ -d ".worktrees/$branch" ]]; then
         local resolved
@@ -78,11 +82,13 @@ cleanup_worktrees() {
             fzf_input+="✗ active  | $branch"$'\t'"$wt_dir"$'\n'
         fi
     done < <(list_worktrees ".worktrees")
+    local noinfo=""
     if [[ -z "$fzf_input" ]]; then
         fzf_input="No worktrees found in .worktrees/ — press Enter to dismiss"
+        noinfo="--no-info"
     fi
     local result
-    result=$(fzf_cleanup_picker "$fzf_input")
+    result=$(fzf_cleanup_picker "$fzf_input" "$noinfo")
     [[ -z "$result" ]] && exit 0
     if [[ "$result" != *$'\t'* ]]; then
         exit 0
