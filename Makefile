@@ -1,11 +1,34 @@
-.PHONY: test test-verbose test-filter test-tap
+.PHONY: test test-verbose test-filter test-tap coverage
 
 BATS := $(if $(shell command -v bats 2>/dev/null),bats,./test/bats/bin/bats)
+KCOV := $(shell command -v kcov 2>/dev/null)
 TEST_DIR := test
+KCOV_DIR := /tmp/kcov-output
 FILTER ?=
 
 test:
+ifdef KCOV
+	rm -rf $(KCOV_DIR)
+	kcov --include-path="$(CURDIR)/scripts" --bash-parse-files-in-dir="$(CURDIR)/scripts" --clean $(KCOV_DIR) $(BATS) $(TEST_DIR)/; \
+	EXIT=$$?; \
+	python3 test/coverage-report.py $(KCOV_DIR); \
+	exit $$EXIT
+else
+	@echo "  kcov not found — install kcov for coverage metrics (https://github.com/SimonKagstrom/kcov)"
 	$(BATS) $(TEST_DIR)/
+endif
+
+coverage:
+ifdef KCOV
+	rm -rf $(KCOV_DIR)
+	kcov --include-path="$(CURDIR)/scripts" --bash-parse-files-in-dir="$(CURDIR)/scripts" --clean $(KCOV_DIR) $(BATS) $(TEST_DIR)/; \
+	EXIT=$$?; \
+	python3 test/coverage-report.py $(KCOV_DIR); \
+	exit $$EXIT
+else
+	@echo "  kcov not found — install kcov for coverage metrics (https://github.com/SimonKagstrom/kcov)"
+	@exit 1
+endif
 
 test-verbose:
 	$(BATS) --verbose-run $(TEST_DIR)/
