@@ -22,7 +22,8 @@ create_or_resume() {
     local worktree_dir
     worktree_dir=$(resolve_worktree_dir)
     ensure_worktrees_dir "$worktree_dir"
-    local target="$worktree_dir/$(echo "$branch" | tr '/' '-')"
+    local target
+    target="$worktree_dir/$(echo "$branch" | tr '/' '-')"
     if [[ ! -d "$target" ]]; then
         local default_branch output
         default_branch=$(resolve_default_branch)
