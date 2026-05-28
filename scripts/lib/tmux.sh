@@ -31,6 +31,17 @@ tmux_select_or_create_window() {
     fi
 }
 
+tmux_create_window() {
+    local branch="$1" cwd="$2" command="$3"
+    tmux new-window -n "wt-$branch" -c "$cwd" "$command"
+    tmux display-message "Opened worktree: $branch"
+}
+
+tmux_show_status_message() {
+    local msg="$1"
+    tmux display-message -d 3000 "tmux-worktrees: $msg" 2>/dev/null || true
+}
+
 tmux_kill_window() {
     local branch="$1"
     if tmux list-windows -F '#{window_name}' 2>/dev/null | grep -Fxq "wt-$branch"; then
